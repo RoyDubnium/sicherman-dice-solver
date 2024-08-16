@@ -1,0 +1,9 @@
+[package]
+name = "sicherman"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+contest-algorithms = "0.3.0"
+itertools = "0.13.0"
+pyo3 = {version="0.22.2", features = ["auto-initialize"]}
