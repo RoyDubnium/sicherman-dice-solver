@@ -1,0 +1,18 @@
+[package]
+name = "sicherman"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sicherman-seq"
+path = "src/main-seq.rs"
+
+[[bin]]
+name = "sicherman-par"
+path = "src/main-par.rs"
+
+[dependencies]
+contest-algorithms = "0.3.0"
+itertools = "0.13.0"
+pyo3 = {version="0.22.2", features = ["auto-initialize"]}
+rayon = "1.10.0"
