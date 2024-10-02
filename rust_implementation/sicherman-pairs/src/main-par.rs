@@ -6,6 +6,7 @@ use std::fs;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use divisors;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut sides = 8;
@@ -22,23 +23,26 @@ fn main() {
     sicherman(sides);
 }
 
-fn factorise(input : Vec<i64>) -> Vec<Vec<i64>> {
+fn factorise(input : u64) -> Vec<Vec<i64>> {
     let mut result : Vec<Vec<i64>> = Vec::new();
+    for i in divisors::get_divisors(input).iter()
+    {
+        if i != &1
+        {
+            result.push(cyclotomic(i.clone()));
+        };
+    }
+    result.push(cyclotomic(input));
+    return result;
+}
+fn cyclotomic(input: u64) -> Vec<i64> {
+    let mut result : Vec<i64> = vec![];
     Python::with_gil(|py| {
         let sympy = py.import_bound("sympy").unwrap();
         let x = sympy.call_method1("symbols", ("x",)).unwrap();
-        let poly = sympy.call_method1("Poly", (input,&x)).unwrap();
-        let polyexp = poly.call_method0("as_expr").unwrap();
-        let factors = polyexp.call_method0("factor").unwrap();
-        let factors_list = factors.getattr("args").unwrap();
-        let factors_len = factors_list.len().unwrap();
-        for factor_idx in 0usize..factors_len
-        {
-            let factor = factors_list.get_item(factor_idx).unwrap();
-            let factor_poly = sympy.call_method1("Poly",(factor,)).unwrap();
-            let coeffs : Vec<i64> = factor_poly.call_method0("all_coeffs").unwrap().extract().unwrap();
-            result.push(coeffs);
-        }
+        let c = sympy.call_method1("cyclotomic_poly", (input, &x)).unwrap();
+        let p = sympy.call_method1("Poly", (c, &x)).unwrap();
+        result = p.call_method0("all_coeffs").unwrap().extract().unwrap();
     });
     return result;
 }
@@ -57,8 +61,7 @@ fn coeff_to_sides(coeffs : Vec<i64>) -> Vec<i64>
 }
 
 fn sicherman(sides: i64) {
-    let polyvec = vec![1; sides as usize];
-    let mut polyfactors = factorise(polyvec);
+    let mut polyfactors = factorise(sides as u64);
     double_vec(&mut polyfactors);
     let factor_length = polyfactors.len();
     println!("{}", factor_length);
