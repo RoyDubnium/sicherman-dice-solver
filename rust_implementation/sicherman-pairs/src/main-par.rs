@@ -5,7 +5,7 @@ use std::env;
 use std::fs;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut sides = 8;
@@ -45,6 +45,16 @@ fn factorise(input : Vec<i64>) -> Vec<Vec<i64>> {
 fn double_vec(vec: &mut Vec<Vec<i64>>) {
     vec.extend_from_within(..);
 }
+fn coeff_to_sides(coeffs : Vec<i64>) -> Vec<i64>
+{
+    let mut sides = Vec::new();
+    for (i, &c) in coeffs.iter().enumerate() {
+        if c > 0 {
+            sides.extend(vec![i as i64 + 1; c as usize]);
+        }
+    }
+    return sides;
+}
 
 fn sicherman(sides: i64) {
     let polyvec = vec![1; sides as usize];
@@ -54,11 +64,12 @@ fn sicherman(sides: i64) {
     println!("{}", factor_length);
     let factor_sums: Vec<i64> = polyfactors.iter().map(|x| x.iter().sum()).collect();
     
-    let results = Arc::new(Mutex::new(Vec::new()));
+    let coeffs_list = Arc::new(Mutex::new(Vec::new()));
+    let result_count = Arc::new(AtomicI32::new(0));
     let found1 = Arc::new(AtomicBool::new(false));  // Persist across iterations
 
-    for iterlen in (factor_length / 2)..factor_length {
-        let results = Arc::clone(&results);
+    for iterlen in (factor_length/2)..factor_length {
+        let coeffs_list = Arc::clone(&coeffs_list);
         let found1 = Arc::clone(&found1);
 
         let found2 = Arc::new(AtomicBool::new(false));  // Reset for each iteration
@@ -89,29 +100,17 @@ fn sicherman(sides: i64) {
                 if ac.iter().min().unwrap() >= &0 && bc.iter().min().unwrap() >= &0 && ac.iter().sum::<i64>() == sides && bc.iter().sum::<i64>() == sides {
                     found1.store(true, Ordering::Relaxed);
                     found2.store(true, Ordering::Relaxed);  // Mark found2 as true
-                    let mut a4 = Vec::new();
-                    let mut b4 = Vec::new();
-                    for (i, &c) in ac.iter().enumerate() {
-                        if c > 0 {
-                            a4.extend(vec![i as i64 + 1; c as usize]);
-                        }
-                    }
-
-                    for (i, &c) in bc.iter().enumerate() {
-                        if c > 0 {
-                            b4.extend(vec![i as i64 + 1; c as usize]);
-                        }
-                    }
-                    let result = if a4 > b4 {
-                        (a4.clone(), b4.clone())
+                    
+                    let coeffs = if ac > bc {
+                        (ac.clone(), bc.clone())
                     } else {
-                        (b4.clone(), a4.clone())
+                        (bc.clone(), ac.clone())
                     };
-
-                    let mut results = results.lock().unwrap();
-                    if !results.iter().any(|i| i == &result) {
-                        println!("{}", a.len());
-                        results.push(result);
+                    let mut coeffs_list = coeffs_list.lock().unwrap();
+                    if !coeffs_list.iter().any(|i| i == &coeffs) {
+                        result_count.store(result_count.load(Ordering::Relaxed)+1, Ordering::Relaxed);
+                        println!("{}: {},{}", result_count.load(Ordering::Relaxed),a.len(),b.len());
+                        coeffs_list.push(coeffs);
                     }
                 }
             });
@@ -123,7 +122,19 @@ fn sicherman(sides: i64) {
     }
 
     let mut contents: Vec<String> = Vec::new();
-    let mut results = Arc::try_unwrap(results).unwrap().into_inner().unwrap();
+    let coeffs_list = Arc::try_unwrap(coeffs_list).unwrap().into_inner().unwrap();
+    let mut results : Vec<(Vec<i64>,Vec<i64>)> = Vec::new();
+    for (ac,bc) in coeffs_list
+    {
+        let a4 = coeff_to_sides(ac);
+        let b4 = coeff_to_sides(bc);
+        let res = if a4 > b4 {
+            (a4, b4)
+        } else {
+            (b4, a4)
+        };
+        results.push(res);
+    }
     results.sort();
     for res in results {
         let resstr = format!("{:?}", res);
