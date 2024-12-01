@@ -55,7 +55,7 @@ fn factorise(input : u64) -> (Vec<Vec<i64>>,Vec<Vec<i64>>) {
 fn cyclotomic(input: u64) -> Vec<i64> {
     let mut result : Vec<i64> = vec![];
     Python::with_gil(|py| {
-        let sympy = py.import_bound("sympy").unwrap();
+        let sympy = py.import("sympy").unwrap();
         let x = sympy.call_method1("symbols", ("x",)).unwrap();
         let c = sympy.call_method1("cyclotomic_poly", (input, &x)).unwrap();
         let p = sympy.call_method1("Poly", (c, &x)).unwrap();
