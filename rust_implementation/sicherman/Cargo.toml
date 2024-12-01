@@ -1,11 +1,7 @@
 [package]
 name = "sicherman"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-
-[[bin]]
-name = "sicherman-seq"
-path = "src/main-seq.rs"
 
 [[bin]]
 name = "sicherman-par"

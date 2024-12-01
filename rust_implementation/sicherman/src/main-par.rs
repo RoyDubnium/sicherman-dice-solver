@@ -5,7 +5,7 @@ use std::env;
 use std::fs;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use divisors;
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,17 +23,34 @@ fn main() {
     sicherman(sides);
 }
 
-fn factorise(input : u64) -> Vec<Vec<i64>> {
-    let mut result : Vec<Vec<i64>> = Vec::new();
+fn factorise(input : u64) -> (Vec<Vec<i64>>,Vec<Vec<i64>>) {
+    let mut ones : Vec<Vec<i64>> = Vec::new();
+    let mut others : Vec<Vec<i64>> = Vec::new();
     for i in divisors::get_divisors(input).iter()
     {
         if i != &1
         {
-            result.push(cyclotomic(i.clone()));
+            let v = cyclotomic(i.clone());
+            if v.iter().sum::<i64>() == 1
+            {
+                ones.push(v);
+            }
+            else 
+            {
+                others.push(v);
+            }
         };
     }
-    result.push(cyclotomic(input));
-    return result;
+    let v = cyclotomic(input);
+    if v.iter().sum::<i64>() == 1
+    {
+        ones.push(v);
+    }
+    else 
+    {
+        others.push(v);
+    }
+    return (ones,others);
 }
 fn cyclotomic(input: u64) -> Vec<i64> {
     let mut result : Vec<i64> = vec![];
@@ -46,9 +63,6 @@ fn cyclotomic(input: u64) -> Vec<i64> {
     });
     return result;
 }
-fn double_vec(vec: &mut Vec<Vec<i64>>) {
-    vec.extend_from_within(..);
-}
 fn coeff_to_sides(coeffs : Vec<i64>) -> Vec<i64>
 {
     let mut sides = Vec::new();
@@ -59,70 +73,87 @@ fn coeff_to_sides(coeffs : Vec<i64>) -> Vec<i64>
     }
     return sides;
 }
+fn onescombos(length : usize,ones : Vec<Vec<i64>>) -> Vec<(Vec<i64>, Vec<i64>)> {
+    //let full = multiply(&ones);
+    //double_vec(&mut ones);
+    let all_combinations: Vec<Vec<usize>> = (0..length)
+        .map(|_| vec![0, 1, 2])
+        .multi_cartesian_product()
+        .collect();
 
+    all_combinations
+        .into_par_iter()
+        .map(|combination| {
+            let first = (0..length)
+                .flat_map(|i| std::iter::repeat(i).take((combination[i as usize]) as usize))
+                .collect::<Vec<usize>>();
+            let second = (0..length)
+                .flat_map(|i| std::iter::repeat(i).take((2 - combination[i as usize]) as usize))
+                .collect::<Vec<usize>>();
+            (multiplyi(&first, &ones ), multiplyi(&second, &ones))
+        })
+        .collect()
+}
+fn multiplyi(a : &Vec<usize>, polyfactors : &Vec<Vec<i64>>) -> Vec<i64>
+{
+    if a.len() == 0
+    {
+        return vec![1];
+    }
+    let mut ac = polyfactors[a[0]].clone();
+    if a.len() > 1 {
+        for i in a.iter().skip(1) {
+            ac = convolution(&ac, &polyfactors[*i]);
+        }
+    }
+    return ac
+}
 fn sicherman(sides: i64) {
-    let mut polyfactors = factorise(sides as u64);
-    double_vec(&mut polyfactors);
+    let factors1 = factorise(sides as u64);
+    println!("{:?}",factors1);
+    println!("{:?}",factors1.0.len()+factors1.1.len());
+    let ones = factors1.0;
+    let combos = onescombos(ones.len(),ones);
+    println!("combos done");
+    let polyfactors = factors1.1;
     let factor_length = polyfactors.len();
-    println!("{}", factor_length);
-    let factor_sums: Vec<i64> = polyfactors.iter().map(|x| x.iter().sum()).collect();
     
     let coeffs_list = Arc::new(Mutex::new(Vec::new()));
     let result_count = Arc::new(AtomicI32::new(0));
-    let found1 = Arc::new(AtomicBool::new(false));  // Persist across iterations
-
-    for iterlen in (factor_length/2)..factor_length {
-        let coeffs_list = Arc::clone(&coeffs_list);
-        let found1 = Arc::clone(&found1);
-
-        let found2 = Arc::new(AtomicBool::new(false));  // Reset for each iteration
-        println!("ilen: {}", iterlen);
-
-        (0..factor_length).combinations(iterlen)
-            .par_bridge() // Convert the iterator to a parallel iterator
-            .for_each(|a| {
-                let product: i64 = a.iter().map(|&i| factor_sums[i]).product();
-                if product != sides {
-                    return;
-                }
-
-                let b: Vec<usize> = (0..factor_length).filter(|i| !a.contains(i)).collect();
-                let mut ac = polyfactors[a[0]].clone();
-                if a.len() > 1 {
-                    for i in a.iter().skip(1) {
-                        ac = convolution(&ac, &polyfactors[*i]);
-                    }
-                }
-                let mut bc = polyfactors[b[0]].clone();
-                if b.len() > 1 {
-                    for i in b.iter().skip(1) {
-                        bc = convolution(&bc, &polyfactors[*i]);
-                    }
-                }
-
-                if ac.iter().min().unwrap() >= &0 && bc.iter().min().unwrap() >= &0 && ac.iter().sum::<i64>() == sides && bc.iter().sum::<i64>() == sides {
-                    found1.store(true, Ordering::Relaxed);
-                    found2.store(true, Ordering::Relaxed);  // Mark found2 as true
-                    
-                    let coeffs = if ac > bc {
-                        (ac.clone(), bc.clone())
+    let all_combinations = (0..factor_length)
+        .map(|_| vec![0, 1, 2])
+        .multi_cartesian_product();
+    all_combinations.par_bridge().for_each(|combination| {
+        let first: Vec<usize> = (0..factor_length)
+            .flat_map(|i| std::iter::repeat(i).take(combination[i as usize] as usize))
+            .collect();
+        let second: Vec<usize> = (0..factor_length)
+            .flat_map(|i| std::iter::repeat(i).take((2 - combination[i as usize]) as usize))
+            .collect();
+        let ac = multiplyi(&first,&polyfactors);
+        let bc = multiplyi(&second,&polyfactors);
+        if ac.iter().sum::<i64>() == sides && bc.iter().sum::<i64>() == sides {
+            for i in combos.iter()
+            {
+                let ac1 = convolution(&i.0, &ac);
+                let bc1 = convolution(&i.1, &bc);
+                if ac1.iter().min().unwrap() >= &0 && bc1.iter().min().unwrap() >= &0
+                {
+                    let coeffs = if ac1 > bc1 {
+                        (ac1.clone(), bc1.clone())
                     } else {
-                        (bc.clone(), ac.clone())
+                        (bc1.clone(), ac1.clone())
                     };
                     let mut coeffs_list = coeffs_list.lock().unwrap();
                     if !coeffs_list.iter().any(|i| i == &coeffs) {
                         result_count.store(result_count.load(Ordering::Relaxed)+1, Ordering::Relaxed);
-                        println!("{}: {},{}", result_count.load(Ordering::Relaxed),a.len(),b.len());
                         coeffs_list.push(coeffs);
                     }
                 }
-            });
-
-        // Break the outer loop if a valid result was found in a previous iteration but not in the current one
-        if found1.load(Ordering::Relaxed) && !found2.load(Ordering::Relaxed) {
-            break;
+            }
+            
         }
-    }
+    });
 
     let mut contents: Vec<String> = Vec::new();
     let coeffs_list = Arc::try_unwrap(coeffs_list).unwrap().into_inner().unwrap();
