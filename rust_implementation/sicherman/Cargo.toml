@@ -7,6 +7,14 @@ edition = "2021"
 name = "sicherman-par"
 path = "src/main-par.rs"
 
+[[bin]]
+name = "sicherman-low"
+path = "src/main-low.rs"
+
+[[bin]]
+name = "sicherman-ultralow"
+path = "src/main-ultralow.rs"
+
 [dependencies]
 contest-algorithms = { git = "https://github.com/RoyDubnium/rust-algorithms.git" }
 divisors = "0.2.1"
