@@ -1,13 +1,14 @@
 use pyo3::prelude::*;
 use itertools::Itertools;
 use contest_algorithms::math::{fft::{dft_from_reals,idft_to_reals},num::CommonField};
-use std::env;
+use std::{env, process::ExitCode};
 use std::fs;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicI32, Ordering};
+use sysinfo::System;
 use divisors;
-fn main() {
+fn main() ->ExitCode {
     let args: Vec<String> = env::args().collect();
     let mut sides = 8;
     if args.len() > 1
@@ -25,7 +26,12 @@ fn main() {
     };
     println!("{:?}",args);
     println!("Hello, world!");
-    sicherman(sides);
+    let status = sicherman(sides);
+    match status
+    {
+        1 => ExitCode::FAILURE,
+        _ => ExitCode::SUCCESS
+    }
 }
 
 fn factorise(input : u64) -> (Vec<Vec<i64>>,Vec<Vec<i64>>) {
@@ -125,12 +131,21 @@ fn muldft(a : &Vec<CommonField>, b: &Vec<CommonField>) -> Vec<CommonField>
 {
     a.iter().zip(b).map(|(c,d)| {c.clone()*d.clone()}).collect()
 }
-fn sicherman(sides: i64) {
+fn sicherman(sides: i64) -> u32 {
     let factors1 = factorise(sides as u64);
     let maxlen : usize = ((factors1.0.iter().map(|a| {a.len()}).sum::<usize>()+factors1.1.iter().map(|a| {a.len()}).sum::<usize>()-factors1.0.len()-factors1.1.len())*2+1).next_power_of_two();
     println!("{}, {}",factors1.0.len(),factors1.1.len());
     println!("{:?}",factors1.0.len()+factors1.1.len());
     let ones = factors1.0;
+    let size = usize::pow(3,ones.len() as u32)*2*maxlen*size_of::<usize>();
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    let avail = sys.total_memory() - sys.used_memory();
+    if 15*avail/16 < size as u64
+    {
+        println!("Memory capacity is not sufficient, please use low memory version");
+        return 1;
+    }
     let onesdft = transformall(&ones, maxlen);
     let combos = onescombos(ones.len(),onesdft,maxlen);
     println!("combos done");
@@ -204,4 +219,5 @@ fn sicherman(sides: i64) {
     }
     let contents_string = contents.join("\n");
     fs::write(format!("./results/sicherman-d{:03}-test.txt", sides), contents_string).expect("Unable to write file");
+    return 0;
 }
