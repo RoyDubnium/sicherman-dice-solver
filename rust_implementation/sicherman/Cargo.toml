@@ -1,15 +1,11 @@
 [package]
 name = "sicherman"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [[bin]]
 name = "sicherman-par"
 path = "src/main-par.rs"
-
-[[bin]]
-name = "sicherman-low"
-path = "src/main-low.rs"
 
 [[bin]]
 name = "sicherman-ultralow"
