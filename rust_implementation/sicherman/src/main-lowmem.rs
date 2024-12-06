@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use itertools::Itertools;
-use contest_algorithms::math::{fft::{convolution,dft_from_reals,idft_to_reals},num::CommonField};
+use contest_algorithms::math::{fft::{dft_from_reals,idft_to_reals},num::CommonField};
 use std::env;
 use std::fs;
 use rayon::prelude::*;
@@ -72,20 +72,6 @@ fn coeff_to_sides(coeffs : Vec<i64>) -> Vec<i64>
         }
     }
     return sides;
-}
-fn multiplyi(a : &Vec<usize>, polyfactors : &Vec<Vec<i64>>) -> Vec<i64>
-{
-    if a.len() == 0
-    {
-        return vec![1];
-    }
-    let mut ac = polyfactors[a[0]].clone();
-    if a.len() > 1 {
-        for i in a.iter().skip(1) {
-            ac = convolution(&ac, &polyfactors[*i]);
-        }
-    }
-    return ac
 }
 fn transformall(facts : &Vec<Vec<i64>>, len : usize) -> Vec<Vec<CommonField>>
 {
