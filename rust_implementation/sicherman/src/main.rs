@@ -18,6 +18,11 @@ fn main() {
             Err(_) => 8
         };
     }
+    match fs::create_dir_all("./results")
+    {
+        Ok(_) => println!("Results folder successfully created."),
+        Err(_) => println!("Failed to create results folder, run in a folder with write permissions.")
+    };
     println!("{:?}",args);
     println!("Hello, world!");
     sicherman(sides);
